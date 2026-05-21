@@ -34,6 +34,7 @@ Bu proje, REST API testlerinin **REST Assured** kütüphanesi kullanılarak otom
 - ✅ **Yanıt süresi** (response time) performans eşik kontrolleri
 - ✅ **JSON → Java POJO** dönüşüm ve nesne bazlı assertion
 - ✅ **Query parameter** filtresi ile veri doğrulama
+- ❌ **Negatif test senaryoları** — Hata durumlarında API yanıtlarının doğrulanması
 
 ---
 
@@ -66,7 +67,8 @@ rest-assured-project/
                 └── tests/
                     ├── BaseTest.java           # Ortak konfigürasyon (base URL, headers, logging)
                     ├── PostGetTest.java         # GET endpoint test senaryoları (5 test)
-                    └── PostCreateTest.java      # POST endpoint test senaryoları (3 test)
+                    ├── PostCreateTest.java      # POST endpoint test senaryoları (3 test)
+                    └── PostNegativeTest.java    # Negatif test senaryoları (8 test: 3 PASS + 5 FAIL)
 ```
 
 ---
@@ -117,6 +119,9 @@ mvn test -Dtest=PostGetTest
 
 # Sadece POST testleri
 mvn test -Dtest=PostCreateTest
+
+# Sadece Negatif testler (hata senaryoları)
+mvn test -Dtest=PostNegativeTest
 ```
 
 ### 5. Tek bir test metodu çalıştırın
@@ -146,6 +151,32 @@ mvn test -Dtest=PostGetTest#getPostById_shouldReturnCorrectPost
 | TC-POST-001 | `createPost_withValidBody_shouldReturn201AndEchoData` | POJO ile post oluştur | Status 201 · Body echo · `id` atanmış · POJO doğrulama |
 | TC-POST-002 | `createPost_withMinimalFields_shouldReturn201` | Minimum alanlarla oluştur | Status 201 · Gönderilen değerler döner |
 | TC-POST-003 | `createPost_withSpecialCharacters_shouldReturn201` | Özel karakterli body | Status 201 · Türkçe karakterler & HTML encoding korunur |
+
+### ❌ Negatif Testler — `PostNegativeTest.java`
+
+Bu sınıf **iki bölümden** oluşur:
+
+#### Bölüm 1: API Hata Yanıtlarını Doğrulayan Testler ✅ (PASS beklenir)
+
+| Test ID | Metot Adı | Açıklama | Doğrulama Kriterleri |
+|---|---|---|---|
+| TC-NEG-001 | `requestToInvalidEndpoint_shouldReturn404` | Geçersiz endpoint'e istek | Status 404 |
+| TC-NEG-002 | `deleteNonExistentPost_shouldHandleGracefully` | Var olmayan kaynağı silme | Status 200 (fake API davranışı) |
+| TC-NEG-003 | `createPost_withEmptyBody_shouldStillReturn201` | Boş body ile POST | Status 201 · `id` atanmış |
+
+#### Bölüm 2: Bilerek Hatalı Beklentiler ❌ (FAIL beklenir)
+
+Bu testler, hata durumlarında REST Assured'ın ürettiği **hata mesajlarını gözlemlemek** amacıyla tasarlanmıştır.
+
+| Test ID | Metot Adı | Hata Türü | Beklenen vs Gerçek |
+|---|---|---|---|
+| TC-NEG-004 | `DELIBERATELY_FAILING_wrongStatusCodeExpectation` | Yanlış status code | `500` beklendi → `200` döndü |
+| TC-NEG-005 | `DELIBERATELY_FAILING_wrongBodyExpectation` | Yanlış body değeri | Sahte başlık beklendi → gerçek başlık döndü |
+| TC-NEG-006 | `DELIBERATELY_FAILING_wrongDataTypeAssertion` | Yanlış veri tipi | `String` beklendi → `Integer` döndü |
+| TC-NEG-007 | `DELIBERATELY_FAILING_expectNonExistentField` | Olmayan JSON alanı | `email` alanı beklendi → `null` döndü |
+| TC-NEG-008 | `DELIBERATELY_FAILING_wrongListSizeExpectation` | Yanlış liste boyutu | `999` beklendi → `100` döndü |
+
+> ⚠️ **Not:** `DELIBERATELY_FAILING` testleri bilerek hata üretmek için tasarlanmıştır. `mvn test` çalıştırıldığında bu 5 test **FAIL** olacaktır — bu beklenen davranıştır.
 
 > 💡 Her test senaryosunda **3 temel kontrol** uygulanır: `statusCode`, `body assertion`, `response time`.
 
@@ -184,8 +215,10 @@ Testler çalıştırıldıktan sonra Maven Surefire raporları otomatik olarak o
 target/surefire-reports/
 ├── TEST-com.example.api.tests.PostGetTest.xml
 ├── TEST-com.example.api.tests.PostCreateTest.xml
+├── TEST-com.example.api.tests.PostNegativeTest.xml
 ├── com.example.api.tests.PostGetTest.txt
-└── com.example.api.tests.PostCreateTest.txt
+├── com.example.api.tests.PostCreateTest.txt
+└── com.example.api.tests.PostNegativeTest.txt
 ```
 
 ---
